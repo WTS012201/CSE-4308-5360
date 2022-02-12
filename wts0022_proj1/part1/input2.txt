@@ -1,0 +1,4 @@
+TEst teqw 12
+TEst teqw 13
+TEst teqw 14
+END OF INPUT
