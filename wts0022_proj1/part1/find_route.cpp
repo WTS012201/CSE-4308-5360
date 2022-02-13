@@ -46,15 +46,13 @@ typedef std::pair<std::string, std::string> edge_pair;
 class graph {
     public:
         std::map<std::string, std::list<std::string>> adj_list;
-        std::map<std::string, bool> visited;
-        std::map<std::string, std::string> path;
         std::map<edge_pair, float> cost;
 
         int expanded;
         int generated;
-        float total_distance;
+        float total_cost;
         
-        graph(std::string infile): expanded{0}, generated{0}, total_distance{0}{
+        graph(std::string infile): expanded{0}, generated{0}, total_cost{0}{
             for(const auto& e : load_edges(std::ifstream{infile}))
                 add_edge(e);
         }
@@ -64,10 +62,6 @@ class graph {
         }
 
         void add_edge(edge e){
-            path[e.get_c1()] = "";
-            path[e.get_c2()] = "";
-            visited[e.get_c1()] = false;
-            visited[e.get_c2()] = false;
             adj_list[e.get_c1()].push_back(e.get_c2());
             adj_list[e.get_c2()].push_back(e.get_c1());
             cost[*make_edge_pair(e.get_c1(), e.get_c2())] = e.get_weight();
@@ -76,35 +70,12 @@ class graph {
 
         void print_route(std::string city1, std::string city2){
             auto is_route = find_route(city1, city2);
-            std::stack<std::string> stack;
-            std::vector<edge> route_edges;
-            std::string prev_city = city1;
             std::cout.precision(1);
-
-            //  Every node that is visited is generated
-            
-            for(const auto& item : visited){
-                if(item.second)
-                    generated++;
-            }
-
-            while(path[city2].compare("")) {
-                stack.push(city2);
-                city2 = path[city2];
-            }
-            
-            while(!stack.empty()) {
-                auto edge_distance = cost[*make_edge_pair(prev_city, stack.top())];
-                total_distance += edge_distance;
-                route_edges.push_back(edge{prev_city, stack.top(), edge_distance});
-                prev_city = stack.top();
-                stack.pop();
-            }
 
             std::cout << "nodes expanded: " << expanded << std::endl;
             std::cout << "nodes generated: " << generated << std::endl;
             if(is_route)
-                std::cout << "distance: " << std::fixed << total_distance << "km\n";
+                std::cout << "distance: " << std::fixed << total_cost << "km\n";
             else
                 std::cout << "distance: infinity\n";
 
@@ -113,13 +84,6 @@ class graph {
                 std::cout << "none\n";
                 return;
             }
-            
-            for(const auto& e : route_edges){
-                std::cout << e.get_c1() << " to " << e.get_c2() << " ";
-                std::cout << std::fixed << e.get_weight();
-                std::cout << " km" << std::endl;
-            }
-            
         }
         
         bool find_route(std::string city1, std::string city2){
@@ -127,27 +91,36 @@ class graph {
             auto cmp = [](route lhs, route rhs){
                 return lhs.second > rhs.second;
             };
-            std::priority_queue<route, std::vector<route>, decltype(cmp)> q(cmp);
-            q.push(route{city1, 0});
-            visited[city1] = true;
-
+            std::priority_queue<route,
+                std::vector<route>, decltype(cmp)> q(cmp);
+            q.push(route{city1, total_cost});
+            
             while(!q.empty()){
                 route city = q.top();
                 q.pop();
-                expanded += 1;  //  city node gets expanded
+    
                 for(auto adj_city: adj_list[city.first]){
-                    if(!visited[adj_city]){
-                        visited[adj_city] = true;
-                        auto adj_cost = cost[*make_edge_pair(city.first, adj_city)];
+                    auto adj_cost{
+                        city.second + cost[*make_edge_pair(city.first, adj_city)]
+                    };
+                    if(!total_cost){
+                        expanded++;     //  node will be queued to expand
                         q.push(route{adj_city, adj_cost});
-                        path[adj_city] = city.first;
-                        if(!adj_city.compare(city2))
-                            return true;
                     }
+                    else if(adj_cost < total_cost){
+                        expanded++;    //  node will be queued to expand
+                        q.push(route{adj_city, adj_cost});
+                    }
+
+                    if(!adj_city.compare(city2) && !total_cost){
+                        std::cout << expanded << "\n";
+                        total_cost = adj_cost;
+                    }
+                    else if(!adj_city.compare(city2) && adj_cost < total_cost)
+                        total_cost = adj_cost;
                 }
             }
-            
-            return false;
+            return total_cost != 0;
         }
 };
 
