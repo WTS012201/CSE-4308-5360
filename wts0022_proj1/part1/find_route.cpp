@@ -2,6 +2,7 @@
 //  CSE 4308/5360
 //  Asssignment 1
 
+#include <utility>
 #include <vector>
 #include <fstream>
 #include <iostream>
@@ -26,7 +27,7 @@ class edge{
 
 void load_edges(std::ifstream ifs, std::vector<edge>& edge_set){
     std::string arg1, arg2, arg3;
-
+    
     while(std::getline(ifs, arg1, ' ')){
         std::getline(ifs, arg2, ' ');
         std::getline(ifs, arg3);
@@ -43,6 +44,7 @@ class graph {
         std::map<std::string, bool> visited;
         std::map<std::string, std::list<std::string>> adj_list;
         std::map<std::string, std::string> route;
+
         std::vector<edge> edge_set;
 
         int expanded;
@@ -78,6 +80,12 @@ class graph {
             std::string prev_city = city1;
             std::cout.precision(1);
 
+            //  Every node that is visited is generated
+            for(const auto& item : visited){
+                if(item.second)
+                    generated++;
+            }
+
             while(route[city2].compare("")) {
                 stack.push(city2);
                 city2 = route[city2];
@@ -91,7 +99,7 @@ class graph {
                 stack.pop();
             }
 
-            std::cout << "nodes expanded: " << visited.size() << std::endl;
+            std::cout << "nodes expanded: " << expanded << std::endl;
             std::cout << "nodes generated: " << generated << std::endl;
             if(is_route)
                 std::cout << "distance: " << std::fixed << total_distance << "km\n";
@@ -113,13 +121,15 @@ class graph {
         
         bool find_route(std::string city1, std::string city2){
             std::queue<std::string> q;
-
+            
             q.push(city1);
             visited[city1] = true;
 
             while(!q.empty()){
                 std::string city = q.front();
+                std::cout << city <<std::endl;
                 q.pop();
+                expanded += 1;  //  city node gets expanded
                 for(std::string adj_city: adj_list[city]){
                     if(!visited[adj_city]){
                         q.push(adj_city);
