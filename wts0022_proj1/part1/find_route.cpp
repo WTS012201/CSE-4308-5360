@@ -43,55 +43,72 @@ std::vector<edge> load_edges(std::ifstream ifs){
 }
 
 typedef std::pair<std::string, std::string> edge_pair;
+typedef std::pair<std::string, float> node;
 
 class graph {
-    public:
-        std::map<std::string, std::list<std::string>> adj_list;
-        std::map<edge_pair, float> cost;
-
+    private:
         int expanded;
         int generated;
         float total_cost;
-        
+
+        std::map<std::string, std::list<std::string>> adj_list;
+        std::map<edge_pair, float> cost;
+        std::map<node, node> predecessors;
+    public:
         graph(std::string infile): expanded{0}, generated{0}, total_cost{0}{
             for(const auto& e : load_edges(std::ifstream{infile}))
                 add_edge(e);
         }
 
-        edge_pair make_edge_pair(std::string vertex1, std::string vertex2){
-            return edge_pair{vertex1, vertex2};
-        }
-
         void add_edge(edge e){
+            predecessors[node{e.get_c1(), 0}] = node{e.get_c2(), 0};
+            predecessors[node{e.get_c2(), 0}] = node{e.get_c1(), 0};
             adj_list[e.get_c1()].push_back(e.get_c2());
             adj_list[e.get_c2()].push_back(e.get_c1());
-            cost[make_edge_pair(e.get_c1(), e.get_c2())] = e.get_cost();
-            cost[make_edge_pair(e.get_c2(), e.get_c1())] = e.get_cost();
+            cost[edge_pair{e.get_c1(), e.get_c2()}] = e.get_cost();
+            cost[edge_pair{e.get_c2(), e.get_c1()}] = e.get_cost();
         }
 
-        void print_node(std::string vertex1, std::string vertex2){
-            auto is_node = find_node(vertex1, vertex2);
+        void print_route(std::string vertex1, std::string vertex2){
+            auto is_node = find_route(vertex1, vertex2);
             std::cout.precision(1);
             
             std::cout << "nodes expanded: " << expanded << std::endl;
             std::cout << "nodes generated: " << generated << std::endl;
             if(is_node)
-                std::cout << "distance: " << std::fixed << total_cost << "km\n";
+                std::cout << "distance: " << std::fixed << total_cost << " km\n";
             else
                 std::cout << "distance: infinity\n";
 
-            std::cout << "node: \n";
+            std::cout << "route: \n";
             if(!is_node){
                 std::cout << "none\n";
                 return;
             }
+            else{
+                auto curr = node{vertex2, total_cost};
+                std::stack<node> route;
+                route.push(curr);
+
+                while(curr.second != 0){
+                    curr = predecessors[curr];
+                    route.push(curr);
+                }
+
+                while(route.size() > 1){
+                    std::string first, second; 
+                    std::cout << (first = route.top().first) << " to ";
+                    route.pop();
+                    std::cout << (second = route.top().first) << ", " ;
+                    std::cout << std::fixed << cost[edge_pair{first, second}] << " km\n";
+                }
+            }
         }
         
-        bool find_node(std::string vertex1, std::string vertex2){
+        bool find_route(std::string vertex1, std::string vertex2){
             if(!vertex1.compare(vertex2))
                 return true;
-
-            typedef std::pair<std::string, float> node;
+            
             auto cmp = [](node lhs, node rhs){
                 return lhs.second > rhs.second;
             };
@@ -122,10 +139,16 @@ class graph {
 
                 for(auto adj_vertex : adj_list[vertex.first]){
                     auto adj_cost{
-                        vertex.second + cost[make_edge_pair(vertex.first, adj_vertex)]
+                        vertex.second + cost[edge_pair{vertex.first, adj_vertex}]
                     };
+                    auto new_node = node{adj_vertex, adj_cost};
+
+                    if(!predecessors[new_node].second)
+                        predecessors[new_node] = vertex;
+                    else if(predecessors[new_node].second >= vertex.second)
+                        predecessors[new_node] = vertex;
+                    q.push(new_node);
                     generated++;
-                    q.push(node{adj_vertex, adj_cost});
                 }
                 closed.insert(vertex.first);
             }
@@ -143,6 +166,6 @@ int main(int argc, char* argv[]){
     std::string destination_city = argv[3];
     std::string heuristic_filename = (argc == 5) ? argv[4] : std::string{};
     graph g{argv[1]};
-    g.print_node(origin_city, destination_city);
+    g.print_route(origin_city, destination_city);
     return 0;
 }
