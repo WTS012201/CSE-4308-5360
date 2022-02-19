@@ -88,6 +88,9 @@ class graph {
         }
         
         bool find_node(std::string vertex1, std::string vertex2){
+            if(!vertex1.compare(vertex2))
+                return true;
+
             typedef std::pair<std::string, float> node;
             auto cmp = [](node lhs, node rhs){
                 return lhs.second > rhs.second;
@@ -97,27 +100,32 @@ class graph {
             q.push(node{vertex1, total_cost});
             std::set<std::string> closed;
             auto min = total_cost;
+            generated++;
 
             while(!q.empty()){
                 node vertex = q.top();
+                auto found = !vertex.first.compare(vertex2);
                 q.pop();
+                // evaluate total cost when found
+                if(found && !total_cost)
+                    total_cost = vertex.second;
+                else if(found && vertex.second < total_cost)
+                    total_cost = vertex.second;
+                else if(total_cost && vertex.second >= total_cost)
+                    continue;
                 expanded++;
+                //  don't expand if found or in closed
+                if(found)
+                    continue;
                 if(closed.find(vertex.first) != closed.end())
                     continue;
-                if(vertex.second < total_cost && !vertex.first.compare(vertex2))
-                    total_cost = vertex.second;
-                else if(total_cost)
-                    continue;
+
                 for(auto adj_vertex : adj_list[vertex.first]){
                     auto adj_cost{
                         vertex.second + cost[make_edge_pair(vertex.first, adj_vertex)]
                     };
+                    generated++;
                     q.push(node{adj_vertex, adj_cost});
-                    auto found = !adj_vertex.compare(vertex2);
-                    if(found && !total_cost)
-                        total_cost = adj_cost;
-                    else if(found && adj_cost < total_cost)
-                        total_cost = adj_cost;
                 }
                 closed.insert(vertex.first);
             }
