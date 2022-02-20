@@ -13,10 +13,13 @@
 #include <queue>
 #include <set>
 
+
+typedef std::pair<std::string, std::string> edge_pair;
+typedef std::pair<std::string, float> node;
+
 class edge{
     private:
-        std::string vertex1;
-        std::string vertex2;
+        std::string vertex1, vertex2;
         float cost;
     public:
         edge(std::string __vertex1, std::string __vertex2, float __cost):
@@ -27,37 +30,59 @@ class edge{
 };
 
 std::vector<edge> load_edges(std::ifstream ifs){
-    std::string arg1, arg2, arg3;
+    std::string args, end = "END OF INPUT";
     std::vector<edge> edge_set;
 
-    while(std::getline(ifs, arg1, ' ')){
-        std::getline(ifs, arg2, ' ');
-        std::getline(ifs, arg3);
-
-        if(!arg1.compare("END") && !arg2.compare("OF"))
+    while(std::getline(ifs, args)){
+        if(args.find(end) != std::string::npos)
             break;
+        std::string arg1, arg2, arg3;
+        auto pos = args.find(' ');
+        
+        arg1 = args.substr(0, pos);
+        args.erase(0, pos + 1);
+        arg2 = args.substr(0, pos = args.find(' '));
+        args.erase(0, pos + 1);
+        arg3 = args.substr(0);
         edge_set.push_back(edge{arg1, arg2, std::stof(arg3)});
     }
     ifs.close();
     return edge_set;
 }
+std::vector<node> load_heuristics(std::ifstream ifs){
+    std::string args, end = "END OF INPUT";
+    std::vector<node> h_set;
 
-typedef std::pair<std::string, std::string> edge_pair;
-typedef std::pair<std::string, float> node;
+    while(std::getline(ifs, args)){
+        if(args.find(end) != std::string::npos)
+            break;
+        std::string arg1, arg2;
+        auto pos = args.find(' ');
+        arg1 = args.substr(0, pos);
+        args.erase(0, pos + 1);
+        arg2 = args.substr(0);
+        h_set.push_back(node{arg1, std::stof(arg2)});
+    }
+    ifs.close();
+    return h_set;
+}
 
 class graph {
     private:
-        int expanded;
-        int generated;
+        int expanded, generated;
         float total_cost;
 
         std::map<std::string, std::list<std::string>> adj_list;
         std::map<edge_pair, float> cost;
         std::map<node, node> predecessors;
+        std::vector<node> heuristic_vals;
     public:
-        graph(std::string infile): expanded{0}, generated{0}, total_cost{0}{
-            for(const auto& e : load_edges(std::ifstream{infile}))
+        graph(std::string infile1, std::string infile2):
+            expanded{0}, generated{0}, total_cost{0}{
+            for(const auto& e : load_edges(std::ifstream{infile1}))
                 add_edge(e);
+            if(infile2.compare(""))
+                heuristic_vals = load_heuristics(std::ifstream{infile2});
         }
 
         void add_edge(edge e){
@@ -162,10 +187,11 @@ int main(int argc, char* argv[]){
         return 1;
     }
 
+    std::string filename = argv[1];
     std::string origin_city = argv[2];
     std::string destination_city = argv[3];
-    std::string heuristic_filename = (argc == 5) ? argv[4] : std::string{};
-    graph g{argv[1]};
-    g.print_route(origin_city, destination_city);
+    std::string heuristic_filename = (argc == 5) ? argv[4] : "";
+    auto g = new graph{filename, heuristic_filename};
+    g -> print_route(origin_city, destination_city);
     return 0;
 }
