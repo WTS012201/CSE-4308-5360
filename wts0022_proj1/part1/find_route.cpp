@@ -51,7 +51,7 @@ std::vector<edge> load_edges(std::ifstream ifs){
 }
 std::vector<node> load_heuristics(std::ifstream ifs){
     std::string args, end = "END OF INPUT";
-    std::vector<node> h_set;
+    std::vector<node> h_vals;
 
     while(std::getline(ifs, args)){
         if(args.find(end) != std::string::npos)
@@ -61,28 +61,33 @@ std::vector<node> load_heuristics(std::ifstream ifs){
         arg1 = args.substr(0, pos);
         args.erase(0, pos + 1);
         arg2 = args.substr(0);
-        h_set.push_back(node{arg1, std::stof(arg2)});
+        h_vals.push_back(node{arg1, std::stof(arg2)});
     }
     ifs.close();
-    return h_set;
+    return h_vals;
 }
 
 class graph {
     private:
         int expanded, generated;
         float total_cost;
+        bool informed_search;
 
         std::map<std::string, std::list<std::string>> adj_list;
         std::map<edge_pair, float> cost;
         std::map<node, node> predecessors;
-        std::vector<node> heuristic_vals;
+        std::map<std::string , float> heuristic_vals;
+        std::stack<node> route;
     public:
         graph(std::string infile1, std::string infile2):
             expanded{0}, generated{0}, total_cost{0}{
             for(const auto& e : load_edges(std::ifstream{infile1}))
                 add_edge(e);
-            if(infile2.compare(""))
-                heuristic_vals = load_heuristics(std::ifstream{infile2});
+            informed_search = infile2.compare("");
+            if(!informed_search)
+                return;
+            for(const auto& h : load_heuristics(std::ifstream{infile2}))
+                heuristic_vals[h.first] = h.second;
         }
 
         void add_edge(edge e){
@@ -95,89 +100,108 @@ class graph {
         }
 
         void print_route(std::string vertex1, std::string vertex2){
-            auto is_node = find_route(vertex1, vertex2);
+            auto route_exist = find_route(vertex1, vertex2);
             std::cout.precision(1);
             
             std::cout << "nodes expanded: " << expanded << std::endl;
             std::cout << "nodes generated: " << generated << std::endl;
-            if(is_node)
+            if(route_exist)
                 std::cout << "distance: " << std::fixed << total_cost << " km\n";
             else
                 std::cout << "distance: infinity\n";
 
             std::cout << "route: \n";
-            if(!is_node){
+            if(!route_exist){
                 std::cout << "none\n";
                 return;
             }
-            else{
-                auto curr = node{vertex2, total_cost};
-                std::stack<node> route;
+            auto curr = node{vertex2, informed_search ? 0 : total_cost};
+            
+            if(!informed_search){
                 route.push(curr);
-
                 while(curr.second != 0){
                     curr = predecessors[curr];
                     route.push(curr);
                 }
-
-                while(route.size() > 1){
-                    std::string first, second; 
-                    std::cout << (first = route.top().first) << " to ";
+            }
+            else{
+                std::stack<node> reverse;
+                while(!route.empty()){
+                    reverse.push(route.top());
                     route.pop();
-                    std::cout << (second = route.top().first) << ", " ;
-                    std::cout << std::fixed << cost[edge_pair{first, second}] << " km\n";
                 }
+                route = reverse;
+            }
+            
+            while(route.size() > 1){
+                std::string first, second; 
+                std::cout << (first = route.top().first) << " to ";
+                route.pop();
+                std::cout << (second = route.top().first) << ", " ;
+                std::cout << std::fixed << cost[edge_pair{first, second}] << " km\n";
             }
         }
         
         bool find_route(std::string vertex1, std::string vertex2){
             if(!vertex1.compare(vertex2))
                 return true;
-            
-            auto cmp = [](node lhs, node rhs){
+            auto route_exist = false;
+            auto cmp = [](node lhs, node rhs) -> bool{
                 return lhs.second > rhs.second;
             };
             std::priority_queue<node,
                 std::vector<node>, decltype(cmp)> q(cmp);
             q.push(node{vertex1, total_cost});
             std::set<std::string> closed;
-            auto min = total_cost;
+            node* prev = nullptr;
             generated++;
 
             while(!q.empty()){
                 node vertex = q.top();
                 auto found = !vertex.first.compare(vertex2);
                 q.pop();
-                // evaluate total cost when found
-                if(found && !total_cost)
-                    total_cost = vertex.second;
-                else if(found && vertex.second < total_cost)
-                    total_cost = vertex.second;
-                else if(total_cost && vertex.second >= total_cost)
-                    continue;
-                expanded++;
-                //  don't expand if found or in closed
-                if(found)
-                    continue;
-                if(closed.find(vertex.first) != closed.end())
-                    continue;
 
+                if(found)
+                    route_exist = found;
+                // evaluate total cost
+                if(!informed_search){
+                    if(found && !total_cost)
+                        total_cost = vertex.second;
+                    else if(found && vertex.second <= total_cost)
+                        total_cost = vertex.second;
+                    else if(total_cost && vertex.second > total_cost)
+                        continue;
+                }
+                else{
+                    if(prev)
+                        total_cost += cost[edge_pair{vertex.first, prev -> first}];
+                    route.push(vertex);
+                }
+                //  don't expand if found or in closed
+                expanded++;
+                if(found && informed_search)
+                    break;
+                if(closed.find(vertex.first) != closed.end() || found)
+                    continue;
                 for(auto adj_vertex : adj_list[vertex.first]){
                     auto adj_cost{
+                        informed_search ? heuristic_vals[adj_vertex] :
                         vertex.second + cost[edge_pair{vertex.first, adj_vertex}]
                     };
                     auto new_node = node{adj_vertex, adj_cost};
-
-                    if(!predecessors[new_node].second)
-                        predecessors[new_node] = vertex;
-                    else if(predecessors[new_node].second >= vertex.second)
-                        predecessors[new_node] = vertex;
+                    if(!informed_search){
+                        if(!predecessors[new_node].second)
+                            predecessors[new_node] = vertex;
+                        else if(predecessors[new_node].second >= vertex.second)
+                            predecessors[new_node] = vertex;
+                    }
                     q.push(new_node);
                     generated++;
                 }
                 closed.insert(vertex.first);
+                prev = new node{vertex};
             }
-            return total_cost;
+            return route_exist;
         }
 };
 
@@ -193,5 +217,6 @@ int main(int argc, char* argv[]){
     std::string heuristic_filename = (argc == 5) ? argv[4] : "";
     auto g = new graph{filename, heuristic_filename};
     g -> print_route(origin_city, destination_city);
+
     return 0;
 }

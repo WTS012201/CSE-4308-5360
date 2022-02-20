@@ -1,4 +1,5 @@
-TEst teqw 12
-TEst teqw 13
-TEst teqw 14
+a b 9
+b c 5
+c d 4
+d a 1
 END OF INPUT
