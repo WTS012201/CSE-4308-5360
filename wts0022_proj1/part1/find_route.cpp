@@ -67,7 +67,7 @@ std::vector<node> load_heuristics(std::ifstream ifs){
     return h_vals;
 }
 
-class graph {
+class search_graph {
     private:
         int expanded, generated;
         float total_cost;
@@ -79,7 +79,7 @@ class graph {
         std::map<std::string , float> heuristic_vals;
         std::stack<node> route;
     public:
-        graph(std::string infile1, std::string infile2):
+        search_graph(std::string infile1, std::string infile2):
             expanded{0}, generated{0}, total_cost{0}{
             for(const auto& e : load_edges(std::ifstream{infile1}))
                 add_edge(e);
@@ -207,7 +207,7 @@ class graph {
 
 int main(int argc, char* argv[]){
     if(argc != 4 && argc != 5){
-        std::cout << "Invalid argument amount. " << argc - 1 << "given\n";
+        std::cout << "Invalid argument amount. " << argc - 1 << " given\n";
         return 1;
     }
 
@@ -215,7 +215,7 @@ int main(int argc, char* argv[]){
     std::string origin_city = argv[2];
     std::string destination_city = argv[3];
     std::string heuristic_filename = (argc == 5) ? argv[4] : "";
-    auto g = new graph{filename, heuristic_filename};
+    auto g = new search_graph{filename, heuristic_filename};
     g -> print_route(origin_city, destination_city);
 
     return 0;
